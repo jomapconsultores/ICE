@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+
+{% block title %}Descarga Masiva SRI{% endblock %}
+
+{% block content %}
+<h2 class="mb-4"><i class="bi bi-cloud-download"></i> Descarga Masiva SRI</h2>
+
+<div class="row">
+    <div class="col-md-6">
+        <div class="card shadow">
+            <div class="card-header bg-dark text-white">
+                <h5 class="mb-0">Subir archivo TXT con claves</h5>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('downloader.procesar_txt') }}" enctype="multipart/form-data" id="formDescarga">
+                    <div class="mb-3">
+                        <label class="form-label">Archivo TXT con claves de acceso (49 digitos)</label>
+                        <input type="file" class="form-control" name="archivo_txt" accept=".txt,.csv,.tsv" required>
+                        <small class="text-muted">El archivo debe contener claves de acceso de 49 digitos del SRI</small>
+                    </div>
+                    
+                    <div id="barraProgreso" style="display:none;" class="mb-3">
+                        <label class="form-label">Progreso: <span id="porcentaje">0%</span></label>
+                        <div class="progress">
+                            <div class="progress-bar progress-bar-striped progress-bar-animated" id="barra" style="width: 0%"></div>
+                        </div>
+                        <small class="text-muted"><span id="completadas">0</span> de <span id="total">0</span></small>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-dark w-100" id="btnDescargar">
+                        <i class="bi bi-download"></i> Iniciar Descarga
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="card shadow">
+            <div class="card-header bg-info text-white">
+                <h5 class="mb-0">Informacion</h5>
+            </div>
+            <div class="card-body">
+                <h6>Como funciona:</h6>
+                <ol>
+                    <li>Descarga el TXT desde el portal del SRI</li>
+                    <li>Sube el archivo aqui</li>
+                    <li>El sistema descarga todas las facturas automaticamente</li>
+                    <li>Las facturas se procesan y guardan en tu cuenta</li>
+                </ol>
+                <div class="alert alert-warning">
+                    <i class="bi bi-exclamation-triangle"></i>
+                    El proceso puede tardar varios minutos dependiendo de la cantidad de facturas.
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.getElementById('formDescarga').addEventListener('submit', function() {
+    document.getElementById('barraProgreso').style.display = 'block';
+    document.getElementById('btnDescargar').disabled = true;
+    document.getElementById('btnDescargar').innerHTML = '<i class="bi bi-hourglass-split"></i> Descargando...';
+    
+    // Consultar progreso cada 3 segundos
+    var intervalo = setInterval(function() {
+        fetch('/downloader/progreso')
+            .then(r => r.json())
+            .then(data => {
+                if (data.total > 0) {
+                    var pct = Math.round((data.completadas / data.total) * 100);
+                    document.getElementById('barra').style.width = pct + '%';
+                    document.getElementById('porcentaje').textContent = pct + '%';
+                    document.getElementById('completadas').textContent = data.completadas;
+                    document.getElementById('total').textContent = data.total;
+                }
+                if (!data.activo && data.completadas > 0) {
+                    clearInterval(intervalo);
+                }
+            });
+    }, 3000);
+});
+</script>
+{% endblock %}

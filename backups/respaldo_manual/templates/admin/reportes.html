@@ -1,0 +1,153 @@
+{% extends "base.html" %}
+
+{% block title %}Reportes Admin{% endblock %}
+
+{% block content %}
+<h2 class="mb-4"><i class="bi bi-bar-chart-fill"></i> Panel de Administración</h2>
+
+<!-- Tarjeta total recaudado -->
+<div class="row mb-4">
+    <div class="col-md-4">
+        <div class="card border-success shadow-sm">
+            <div class="card-body text-center">
+                <h6 class="text-muted">Total Recaudado</h6>
+                <h2 class="text-success">${{ '%.2f' % total_recaudado }}</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card border-primary shadow-sm">
+            <div class="card-body text-center">
+                <h6 class="text-muted">Total Usuarios</h6>
+                <h2 class="text-primary">{{ usuarios | length }}</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card border-warning shadow-sm">
+            <div class="card-body text-center">
+                <h6 class="text-muted">Facturas Pendientes</h6>
+                <h2 class="text-warning">{{ facturas_pendientes | length }}</h2>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Recaudación por usuario -->
+<div class="card shadow mb-4">
+    <div class="card-header"><h5 class="mb-0">Recaudación por Usuario</h5></div>
+    <div class="card-body p-0">
+        <table class="table table-hover table-sm mb-0">
+            <thead class="table-dark">
+                <tr>
+                    <th>Usuario</th>
+                    <th class="text-center">Pagos</th>
+                    <th class="text-end">Total ($)</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for fila in recaudacion_usuarios %}
+                <tr>
+                    <td>{{ fila.nombre }}</td>
+                    <td class="text-center">{{ fila.cantidad }}</td>
+                    <td class="text-end">{{ '%.2f' % (fila.total or 0) }}</td>
+                </tr>
+                {% else %}
+                <tr><td colspan="3" class="text-center text-muted py-3">Sin pagos registrados</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Recaudación mensual -->
+<div class="card shadow mb-4">
+    <div class="card-header"><h5 class="mb-0">Recaudación Mensual</h5></div>
+    <div class="card-body p-0">
+        <table class="table table-hover table-sm mb-0">
+            <thead class="table-dark">
+                <tr>
+                    <th>Año</th>
+                    <th>Mes</th>
+                    <th class="text-center">Pagos</th>
+                    <th class="text-end">Total ($)</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for fila in recaudacion_mensual %}
+                <tr>
+                    <td>{{ fila.anio | int }}</td>
+                    <td>{{ '%02d' % (fila.mes | int) }}</td>
+                    <td class="text-center">{{ fila.cantidad }}</td>
+                    <td class="text-end">{{ '%.2f' % (fila.total or 0) }}</td>
+                </tr>
+                {% else %}
+                <tr><td colspan="4" class="text-center text-muted py-3">Sin datos mensuales</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Facturas pendientes de emisión -->
+<div class="card shadow mb-4">
+    <div class="card-header"><h5 class="mb-0">Facturas Pendientes de Emisión</h5></div>
+    <div class="card-body p-0">
+        <table class="table table-hover table-sm mb-0">
+            <thead class="table-dark">
+                <tr>
+                    <th>N° Factura</th>
+                    <th>Fecha Emisión</th>
+                    <th class="text-end">Monto ($)</th>
+                    <th class="text-center">Acción</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for f in facturas_pendientes %}
+                <tr>
+                    <td>{{ f.numero_factura }}</td>
+                    <td>{{ f.fecha_emision.strftime('%d/%m/%Y') if f.fecha_emision else '-' }}</td>
+                    <td class="text-end">{{ '%.2f' % (f.monto or 0) }}</td>
+                    <td class="text-center">
+                        <form method="POST" action="{{ url_for('admin_reports.marcar_factura', factura_id=f.id) }}" class="d-inline">
+                            <button type="submit" class="btn btn-sm btn-success">
+                                <i class="bi bi-check-circle"></i> Marcar Emitida
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="4" class="text-center text-muted py-3">Sin facturas pendientes</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Generar nueva factura -->
+<div class="card shadow mb-4">
+    <div class="card-header"><h5 class="mb-0">Generar Factura Manual</h5></div>
+    <div class="card-body">
+        <form method="POST" action="{{ url_for('admin_reports.generar_factura') }}" class="row g-3">
+            <div class="col-md-6">
+                <label class="form-label">Usuario</label>
+                <select name="usuario_id" class="form-select" required>
+                    <option value="">Selecciona un usuario...</option>
+                    {% for u in usuarios %}
+                    <option value="{{ u.id }}">{{ u.nombre }} ({{ u.email }})</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Monto ($)</label>
+                <input type="number" name="monto" step="0.01" min="0.01" class="form-control" required>
+            </div>
+            <div class="col-md-2 d-flex align-items-end">
+                <button type="submit" class="btn btn-primary w-100">
+                    <i class="bi bi-file-earmark-plus"></i> Generar
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
