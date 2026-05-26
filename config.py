@@ -5,7 +5,7 @@ load_dotenv()
 
 class Config:
     SECRET_KEY = os.getenv('SECRET_KEY', 'clave-super-secreta-cambiar-en-produccion')
-    SQLALCHEMY_DATABASE_URI = 'sqlite:///sistema_ice.db'
+    SQLALCHEMY_DATABASE_URI = 'postgresql+psycopg://postgres:MiGestorSRI2026!@db.qrifxntyxpgovpibvees.supabase.co:5432/postgres'
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
     BASE_URL = os.getenv('BASE_URL', 'http://localhost:5000')
