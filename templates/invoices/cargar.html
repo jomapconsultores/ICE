@@ -1,55 +1,123 @@
 {% extends "base.html" %}
+
 {% block title %}Cargar Facturas{% endblock %}
+
 {% block content %}
-<h2 class="mb-4">Cargar Facturas XML</h2>
-<div class="row">
-    <div class="col-md-6">
-        <div class="card shadow">
-            <div class="card-header bg-primary text-white">
-                <h5 class="mb-0">Subir archivos XML del SRI</h5>
-            </div>
-            <div class="card-body">
-                <form method="POST" action="{{ url_for('invoices.subir_facturas') }}" enctype="multipart/form-data">
-                    <div class="mb-3">
-                        <label for="archivos" class="form-label">Selecciona los archivos XML</label>
-                        <input type="file" class="form-control" id="archivos" name="archivos" multiple accept=".xml" required>
-                        <small class="text-muted">Puedes seleccionar varios archivos a la vez</small>
-                    </div>
-                    <button type="submit" class="btn btn-primary">Procesar Facturas</button>
-                </form>
-            </div>
-        </div>
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2 class="page-title mb-1"><i class="bi bi-upload me-2"></i>Cargar Facturas XML</h2>
+        <p class="text-muted mb-0">Arrastra tus archivos XML del SRI para procesarlos</p>
     </div>
-    <div class="col-md-6">
-        <div class="card shadow">
-            <div class="card-header bg-info text-white">
-                <h5 class="mb-0">Informacion</h5>
-            </div>
-            <div class="card-body">
-                <ul>
-                    <li>Formatos aceptados: XML de facturas electronicas del SRI</li>
-                    <li>Se detectan duplicados automaticamente</li>
-                    <li>Los datos de ICE e IVA se extraen automaticamente</li>
-                </ul>
+</div>
+
+<div class="row g-4">
+    <!-- ZONA DE ARRASTRE -->
+    <div class="col-12">
+        <div class="card shadow-sm border-0">
+            <div class="card-body p-5">
+                <div class="text-center mb-4">
+                    <h5><i class="bi bi-cloud-arrow-up me-2"></i>Selecciona el tipo de factura y arrastra los archivos</h5>
+                </div>
+                
+                <div class="row g-4">
+                    <!-- GASTOS -->
+                    <div class="col-md-6">
+                        <div class="drop-zone" id="dropZoneGasto" data-tipo="gasto">
+                            <div class="drop-zone-content">
+                                <i class="bi bi-cart text-danger" style="font-size:3rem;"></i>
+                                <h4 class="mt-3">GASTOS</h4>
+                                <p class="text-muted">Facturas de compras y gastos personales</p>
+                                <p class="small text-muted">
+                                    <i class="bi bi-info-circle me-1"></i>
+                                    Clasifica: Alimentación, Educación, Salud, Vestimenta, Vivienda, Turismo
+                                </p>
+                                <span class="badge bg-danger fs-6">Arrastra aquí los XML de GASTO</span>
+                            </div>
+                            <input type="file" id="inputGasto" name="archivos" multiple accept=".xml" class="d-none">
+                        </div>
+                        <div class="text-center mt-2" id="contadorGasto" style="display:none;">
+                            <span class="badge bg-danger fs-6" id="countGasto">0 archivos seleccionados</span>
+                        </div>
+                        <form id="formGasto" method="POST" action="{{ url_for('invoices.subir_facturas') }}" enctype="multipart/form-data">
+                            <input type="hidden" name="tipo" value="gasto">
+                            <div id="archivosGasto"></div>
+                            <button type="submit" class="btn btn-danger w-100 mt-2" id="btnGasto" style="display:none;">
+                                <i class="bi bi-upload me-1"></i> Procesar Gastos
+                            </button>
+                        </form>
+                    </div>
+                    
+                    <!-- INGRESOS -->
+                    <div class="col-md-6">
+                        <div class="drop-zone" id="dropZoneIngreso" data-tipo="ingreso">
+                            <div class="drop-zone-content">
+                                <i class="bi bi-graph-up text-success" style="font-size:3rem;"></i>
+                                <h4 class="mt-3">INGRESOS</h4>
+                                <p class="text-muted">Facturas de ventas con ICE</p>
+                                <p class="small text-muted">
+                                    <i class="bi bi-info-circle me-1"></i>
+                                    Calcula ICE, IVA y alimenta automáticamente los Anexos PVP e ICE
+                                </p>
+                                <span class="badge bg-success fs-6">Arrastra aquí los XML de INGRESO</span>
+                            </div>
+                            <input type="file" id="inputIngreso" name="archivos" multiple accept=".xml" class="d-none">
+                        </div>
+                        <div class="text-center mt-2" id="contadorIngreso" style="display:none;">
+                            <span class="badge bg-success fs-6" id="countIngreso">0 archivos seleccionados</span>
+                        </div>
+                        <form id="formIngreso" method="POST" action="{{ url_for('invoices.subir_facturas') }}" enctype="multipart/form-data">
+                            <input type="hidden" name="tipo" value="ingreso">
+                            <div id="archivosIngreso"></div>
+                            <button type="submit" class="btn btn-success w-100 mt-2" id="btnIngreso" style="display:none;">
+                                <i class="bi bi-upload me-1"></i> Procesar Ingresos
+                            </button>
+                        </form>
+                    </div>
+                </div>
+                
+                <div class="text-center mt-4">
+                    <p class="text-muted small">También puedes hacer clic en cada zona para seleccionar archivos</p>
+                </div>
             </div>
         </div>
     </div>
 </div>
+
+<!-- ÚLTIMAS FACTURAS -->
 {% if facturas %}
-<div class="card mt-4 shadow">
-    <div class="card-header bg-light"><h5 class="mb-0">Ultimas facturas procesadas</h5></div>
+<div class="card shadow-sm border-0 mt-4">
+    <div class="card-header bg-light">
+        <h5 class="mb-0"><i class="bi bi-clock-history me-2"></i>Últimas Facturas Procesadas</h5>
+    </div>
     <div class="card-body table-responsive">
-        <table class="table table-striped table-sm">
-            <thead><tr><th>Fecha</th><th>N Factura</th><th>Cliente</th><th>Total</th><th>ICE</th><th>IVA</th></tr></thead>
+        <table class="table table-hover table-sm">
+            <thead class="table-light">
+                <tr>
+                    <th>Tipo</th>
+                    <th>Fecha</th>
+                    <th>N° Factura</th>
+                    <th>Cliente</th>
+                    <th>Total</th>
+                    <th>ICE</th>
+                    <th>IVA</th>
+                </tr>
+            </thead>
             <tbody>
                 {% for f in facturas[:10] %}
                 <tr>
+                    <td>
+                        {% if f.tipo == 'gasto' %}
+                        <span class="badge bg-danger">Gasto</span>
+                        {% else %}
+                        <span class="badge bg-success">Ingreso</span>
+                        {% endif %}
+                    </td>
                     <td>{{ f.fecha_emision.strftime('%d/%m/%Y') if f.fecha_emision else 'N/A' }}</td>
                     <td>{{ f.numero_factura }}</td>
-                    <td>{{ f.razon_social_comprador[:30] if f.razon_social_comprador else 'N/A' }}</td>
+                    <td>{{ f.razon_social_comprador[:25] if f.razon_social_comprador else 'N/A' }}</td>
                     <td>${{ '%.2f'|format(f.importe_total) }}</td>
-                    <td>${{ '%.2f'|format(f.valor_ice) }}</td>
-                    <td>${{ '%.2f'|format(f.valor_iva) }}</td>
+                    <td>${{ '%.2f'|format(f.valor_ice or 0) }}</td>
+                    <td>${{ '%.2f'|format(f.valor_iva or 0) }}</td>
                 </tr>
                 {% endfor %}
             </tbody>
@@ -57,4 +125,99 @@
     </div>
 </div>
 {% endif %}
+
+<style>
+.drop-zone {
+    border: 3px dashed #cbd5e1;
+    border-radius: 16px;
+    padding: 2rem;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s;
+    background: #f8fafc;
+    min-height: 250px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.drop-zone:hover, .drop-zone.drag-over {
+    border-color: #3b82f6;
+    background: #eff6ff;
+    transform: scale(1.02);
+}
+.drop-zone-content {
+    pointer-events: none;
+}
+</style>
+
+<script>
+function setupDropZone(zoneId, inputId, formId, contadorId, countId, btnId, archivosDivId) {
+    const dropZone = document.getElementById(zoneId);
+    const input = document.getElementById(inputId);
+    const form = document.getElementById(formId);
+    const contador = document.getElementById(contadorId);
+    const countSpan = document.getElementById(countId);
+    const btn = document.getElementById(btnId);
+    const archivosDiv = document.getElementById(archivosDivId);
+    
+    // Clic para abrir selector
+    dropZone.addEventListener('click', () => input.click());
+    
+    // Drag & Drop
+    dropZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropZone.classList.add('drag-over');
+    });
+    
+    dropZone.addEventListener('dragleave', () => {
+        dropZone.classList.remove('drag-over');
+    });
+    
+    dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('drag-over');
+        handleFiles(e.dataTransfer.files);
+    });
+    
+    input.addEventListener('change', (e) => {
+        handleFiles(e.target.files);
+    });
+    
+    function handleFiles(files) {
+        archivosDiv.innerHTML = '';
+        let count = 0;
+        
+        for (let file of files) {
+            if (file.name.endsWith('.xml')) {
+                // Clonar el archivo en un nuevo input
+                const dt = new DataTransfer();
+                dt.items.add(file);
+                const newInput = document.createElement('input');
+                newInput.type = 'file';
+                newInput.name = 'archivos';
+                newInput.files = dt.files;
+                newInput.style.display = 'none';
+                archivosDiv.appendChild(newInput);
+                count++;
+            }
+        }
+        
+        if (count > 0) {
+            contador.style.display = 'block';
+            countSpan.textContent = count + ' archivo(s) seleccionado(s)';
+            btn.style.display = 'block';
+            dropZone.style.borderColor = '#059669';
+            dropZone.style.background = '#f0fdf4';
+        } else {
+            contador.style.display = 'none';
+            btn.style.display = 'none';
+            dropZone.style.borderColor = '#cbd5e1';
+            dropZone.style.background = '#f8fafc';
+        }
+    }
+}
+
+setupDropZone('dropZoneGasto', 'inputGasto', 'formGasto', 'contadorGasto', 'countGasto', 'btnGasto', 'archivosGasto');
+setupDropZone('dropZoneIngreso', 'inputIngreso', 'formIngreso', 'contadorIngreso', 'countIngreso', 'btnIngreso', 'archivosIngreso');
+</script>
 {% endblock %}

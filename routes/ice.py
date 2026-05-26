@@ -40,7 +40,6 @@ def calcular():
         resultados = {}
         for anio in anios:
             if anio == '2024':
-                # 2024 con ambos periodos
                 res_12 = IceCalculator.calcular_liquidacion_completa(datos, '2024', iva_tasa=0.12)
                 res_15 = IceCalculator.calcular_liquidacion_completa(datos, '2024', iva_tasa=0.15)
                 resultados['2024 (12%)'] = res_12
@@ -74,7 +73,6 @@ def calcular_multiple():
             flash('Selecciona al menos un ano.', 'warning')
             return render_template('ice/multiple.html', tax_db=TAX_DB)
         
-        # Obtener todos los productos del formulario
         productos = []
         indices = set()
         for key in request.form.keys():
@@ -105,7 +103,6 @@ def calcular_multiple():
             flash('Agrega al menos un producto.', 'warning')
             return render_template('ice/multiple.html', tax_db=TAX_DB)
         
-        # Calcular para cada producto y cada año
         resultados = {}
         for anio in anios:
             resultados[anio] = []
@@ -124,7 +121,6 @@ def calcular_multiple():
                     res['nombre'] = prod['nombre']
                     resultados[anio].append(res)
         
-        # Calcular totales
         totales = {}
         for anio, items in resultados.items():
             totales[anio] = {
@@ -189,7 +185,6 @@ def calcular_mezcla():
             flash('Agrega al menos un producto.', 'warning')
             return render_template('ice/mezcla.html', tax_db=TAX_DB)
         
-        # Calcular combinado
         resultados = {}
         for anio in anios:
             if anio == '2024':

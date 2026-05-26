@@ -5,6 +5,7 @@ from models.user import Factura, Suscripcion
 from services.xml_parser import parse_xml_factura
 from datetime import datetime
 import os
+import json
 
 invoices = Blueprint('invoices', __name__)
 
@@ -16,10 +17,6 @@ if not os.path.exists(UPLOAD_FOLDER):
 def verificar_limite_facturas():
     if not current_user.tiene_suscripcion_activa():
         return False, "No tienes una suscripcion activa"
-    suscripcion = current_user.suscripcion
-    if suscripcion.plan_id == 'basico':
-        if suscripcion.facturas_procesadas_mes >= 100:
-            return False, "Has alcanzado el limite de 100 facturas este mes"
     return True, "OK"
 
 
@@ -29,7 +26,9 @@ def pagina_carga():
     puede, mensaje = verificar_limite_facturas()
     if not puede:
         flash(mensaje, 'warning')
-    facturas = Factura.query.filter_by(usuario_id=current_user.id).order_by(Factura.fecha_procesamiento.desc()).limit(50).all()
+    facturas = Factura.query.filter_by(usuario_id=current_user.id)\
+                           .order_by(Factura.fecha_procesamiento.desc())\
+                           .limit(50).all()
     return render_template('invoices/cargar.html', facturas=facturas)
 
 
@@ -40,31 +39,43 @@ def subir_facturas():
     if not puede:
         flash(mensaje, 'danger')
         return redirect(url_for('invoices.pagina_carga'))
+    
+    tipo = request.form.get('tipo', 'gasto')  # 'gasto' o 'ingreso'
+    
     if 'archivos' not in request.files:
         flash('No se seleccionaron archivos.', 'warning')
         return redirect(url_for('invoices.pagina_carga'))
+    
     archivos = request.files.getlist('archivos')
+    
     if not archivos or archivos[0].filename == '':
         flash('No se seleccionaron archivos.', 'warning')
         return redirect(url_for('invoices.pagina_carga'))
+    
     procesadas = 0
     errores = 0
     duplicadas = 0
+    
     for archivo in archivos:
         if not archivo.filename.endswith('.xml'):
             continue
+        
         ruta_temp = os.path.join(UPLOAD_FOLDER, archivo.filename)
         archivo.save(ruta_temp)
+        
         try:
             datos = parse_xml_factura(ruta_temp)
+            
             if datos is None:
                 errores += 1
                 continue
+            
             existente = Factura.query.filter_by(clave_acceso=datos['clave_acceso']).first()
             if existente:
                 duplicadas += 1
                 os.remove(ruta_temp)
                 continue
+            
             factura = Factura(
                 usuario_id=current_user.id,
                 clave_acceso=datos['clave_acceso'],
@@ -79,36 +90,63 @@ def subir_facturas():
                 valor_ice=sum(p['ice'] for p in datos['productos']),
                 base_iva=sum(p['base_iva'] for p in datos['productos']),
                 valor_iva=sum(p['iva'] for p in datos['productos']),
-                xml_original=''
+                xml_original='',
+                tipo=tipo
             )
             db.session.add(factura)
+            
             suscripcion = current_user.suscripcion
             if suscripcion:
                 suscripcion.facturas_procesadas_mes += 1
+            
             procesadas += 1
+        
         except Exception as e:
             print(f"Error: {e}")
             errores += 1
+        
         finally:
             if os.path.exists(ruta_temp):
                 os.remove(ruta_temp)
+    
     db.session.commit()
-    flash(f'{procesadas} facturas procesadas. Errores: {errores}. Duplicadas: {duplicadas}.', 'success')
+    
+    if tipo == 'gasto':
+        flash(f'✅ {procesadas} facturas de GASTO procesadas. Errores: {errores}. Duplicadas: {duplicadas}.', 'success')
+    else:
+        flash(f'✅ {procesadas} facturas de INGRESO procesadas. Errores: {errores}. Duplicadas: {duplicadas}.', 'success')
+    
     return redirect(url_for('invoices.pagina_carga'))
 
 
 @invoices.route('/ver')
 @login_required
 def ver_facturas():
-    facturas = Factura.query.filter_by(usuario_id=current_user.id).order_by(Factura.fecha_procesamiento.desc()).all()
-    return render_template('invoices/ver.html', facturas=facturas)
+    tipo = request.args.get('tipo', 'todas')
+    
+    query = Factura.query.filter_by(usuario_id=current_user.id)
+    
+    if tipo == 'gasto':
+        query = query.filter_by(tipo='gasto')
+        titulo = 'Facturas de Gasto'
+    elif tipo == 'ingreso':
+        query = query.filter_by(tipo='ingreso')
+        titulo = 'Facturas de Ingreso'
+    else:
+        titulo = 'Todas las Facturas'
+    
+    facturas = query.order_by(Factura.fecha_procesamiento.desc()).all()
+    
+    return render_template('invoices/ver.html', facturas=facturas, titulo=titulo, tipo=tipo)
 
 
 @invoices.route('/resumen')
 @login_required
 def resumen():
     from sqlalchemy import func, extract
+    
     resumen = db.session.query(
+        Factura.tipo,
         extract('year', Factura.fecha_emision).label('anio'),
         extract('month', Factura.fecha_emision).label('mes'),
         func.count(Factura.id).label('cantidad'),
@@ -117,5 +155,8 @@ def resumen():
         func.sum(Factura.valor_ice).label('ice'),
         func.sum(Factura.base_iva).label('base_iva'),
         func.sum(Factura.valor_iva).label('iva')
-    ).filter(Factura.usuario_id == current_user.id).group_by('anio', 'mes').order_by('anio', 'mes').all()
+    ).filter(
+        Factura.usuario_id == current_user.id
+    ).group_by(Factura.tipo, 'anio', 'mes').order_by('anio', 'mes').all()
+    
     return render_template('invoices/resumen.html', resumen=resumen)

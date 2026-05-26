@@ -4,9 +4,12 @@ from config import Config
 
 class PayPhoneService:
     API_URL = "https://pay.payphonetodoesposible.com/api"
-
+    
     @staticmethod
     def get_token():
+        if Config.PAYPHONE_CLIENT_ID == 'TU_CLIENT_ID':
+            return None
+        
         try:
             response = requests.post(
                 f"{PayPhoneService.API_URL}/v1/auth/token",
@@ -17,64 +20,61 @@ class PayPhoneService:
                 timeout=10
             )
             if response.status_code == 200:
-                return response.json().get('token')
+                data = response.json()
+                return data.get('token')
             return None
-        except:
+        except Exception as e:
+            print(f"Error PayPhone token: {e}")
             return None
-
+    
     @staticmethod
-    def crear_pago(plan_id, usuario_email, usuario_nombre):
-        planes = {
-            'basico': Config.PLAN_BASICO,
-            'profesional': Config.PLAN_PROFESIONAL,
-            'empresarial': Config.PLAN_EMPRESARIAL
-        }
-        if plan_id not in planes:
-            return None, "Plan no valido"
-        plan = planes[plan_id]
+    def crear_pago(monto, usuario_email, descripcion, transaction_id):
         token = PayPhoneService.get_token()
+        
         if not token:
-            return None, "Error de conexion con PayPhone"
+            return None, None
+        
         try:
             payload = {
-                "amount": plan['precio'],
-                "amountWithoutTax": plan['precio'],
-                "amountWithTax": 0,
-                "tax": 0,
-                "clientTransactionId": f"{plan_id}_{usuario_email}",
-                "responseUrl": f"{Config.BASE_URL}/payments/respuesta",
+                "amount": monto,
+                "amountWithoutTax": round(monto / 1.15, 2),
+                "amountWithTax": round(monto * 0.15, 2),
+                "tax": round(monto * 0.15, 2),
+                "clientTransactionId": transaction_id,
+                "responseUrl": f"{Config.BASE_URL}/payments/respuesta_payphone",
                 "cancellationUrl": f"{Config.BASE_URL}/payments/planes",
-                "reference": f"Suscripcion {plan['nombre']} - Gestor SRI",
+                "reference": descripcion,
                 "phoneNumber": "0999999999",
-                "email": usuario_email,
-                "optionalParameter": json.dumps({
-                    "plan_id": plan_id,
-                    "usuario_email": usuario_email
-                })
+                "email": usuario_email
             }
+            
             headers = {
                 "Authorization": f"Bearer {token}",
                 "Content-Type": "application/json"
             }
+            
             response = requests.post(
                 f"{PayPhoneService.API_URL}/v1/button/pay",
                 json=payload,
                 headers=headers,
                 timeout=15
             )
+            
             if response.status_code == 200:
                 data = response.json()
                 return data.get('payUrl'), None
             else:
-                return None, f"Error: {response.text}"
+                return None, f"Error PayPhone: {response.text}"
+        
         except Exception as e:
             return None, f"Error: {str(e)}"
-
+    
     @staticmethod
     def verificar_pago(transaction_id):
         token = PayPhoneService.get_token()
         if not token:
             return None
+        
         try:
             headers = {"Authorization": f"Bearer {token}"}
             response = requests.get(

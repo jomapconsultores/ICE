@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+{% block title %}Planes{% endblock %}
+{% block content %}
+<div class="text-center mb-4">
+    <h2 class="page-title">Arma tu Plan</h2>
+    <p class="section-subtitle">Selecciona módulos y duración. Descuentos desde 3 meses + 3 módulos.</p>
+</div>
+
+<div class="row">
+    <div class="col-lg-8">
+        <div class="card mb-3">
+            <div class="card-header">Módulos Disponibles</div>
+            <div class="card-body">
+                <div class="row g-2">
+                    {% for id, m in modulos.items() %}
+                    <div class="col-6">
+                        <div class="card border modulo-card h-100" onclick="toggleModulo('{{ id }}', this)" data-bs-toggle="tooltip" title="{{ m.tooltip }}" style="cursor:pointer;">
+                            <div class="card-body p-2">
+                                <div class="d-flex align-items-start gap-2">
+                                    <input class="form-check-input mt-1" type="checkbox" name="modulos" value="{{ id }}" id="mod_{{ id }}" onchange="actualizarPrecio()" onclick="event.stopPropagation()">
+                                    <div class="w-100">
+                                        <div class="d-flex align-items-center gap-2 mb-1">
+                                            <span class="badge bg-{{ m.color }} bg-opacity-10 text-{{ m.color }} p-1"><i class="bi bi-{{ m.icono }}"></i></span>
+                                            <span class="fw-bold small">{{ m.nombre }}</span>
+                                        </div>
+                                        <p class="text-muted mb-1" style="font-size:0.7rem;">{{ m.descripcion[:80] }}...</p>
+                                        <div>
+                                            {% if m.precio_unico %}
+                                            <span class="badge bg-warning text-dark">PAGO ÚNICO</span>
+                                            <span class="badge bg-{{ m.color }}">${{ m.precio }}</span>
+                                            {% else %}
+                                            <span class="badge bg-{{ m.color }}">${{ m.precio }}/mes</span>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-4">
+        <div class="card sticky-top" style="top:70px;">
+            <div class="card-header bg-primary text-white">Resumen</div>
+            <div class="card-body">
+                <select class="form-select form-select-sm mb-3" id="duracion" onchange="actualizarPrecio()">
+                    {% for meses, info in duraciones.items() %}
+                    <option value="{{ meses }}">{{ info.nombre }}{% if info.descuento > 0 and meses >= 3 %} (-{{ info.descuento }}%){% endif %}</option>
+                    {% endfor %}
+                </select>
+                
+                <div id="resumenModulos" class="small mb-2 text-muted">Selecciona módulos</div>
+                
+                <div class="bg-light rounded p-2 small">
+                    <div class="d-flex justify-content-between"><span>Mensual</span><span id="precioMensual">$0</span></div>
+                    <div class="d-flex justify-content-between" id="filaUnico" style="display:none;"><span>Únicos</span><span id="precioUnico">$0</span></div>
+                    <div class="d-flex justify-content-between"><span>Subtotal</span><span id="subtotalFinal">$0</span></div>
+                    <div class="d-flex justify-content-between text-success" id="filaDescuento" style="display:none;"><span>Desc. <span id="descuentoPct">0</span>%</span><span id="descuentoMonto">$0</span></div>
+                    <div class="d-flex justify-content-between"><span>IVA</span><span id="iva">$0</span></div>
+                    <hr class="my-1">
+                    <div class="d-flex justify-content-between fw-bold"><span>TOTAL</span><span id="total">$0</span></div>
+                </div>
+                
+                <button class="btn btn-primary btn-sm w-100 mt-3" data-bs-toggle="modal" data-bs-target="#modalPago">
+                    <i class="bi bi-bank me-1"></i>Pagar con Transferencia
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modalPago" tabindex="-1">
+    <div class="modal-dialog modal-sm">
+        <div class="modal-content">
+            <div class="modal-header"><h6 class="modal-title">Transferencia Bancaria</h6><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body">
+                <div class="alert alert-info small">
+                    <strong>{{ config.BANCO_NOMBRE }}</strong><br>
+                    Cuenta: {{ config.BANCO_CUENTA }}<br>
+                    Titular: {{ config.BANCO_TITULAR }}
+                </div>
+                <form method="POST" action="{{ url_for('payments.pagar_transferencia') }}" enctype="multipart/form-data">
+                    <div id="modulosTransferencia"></div>
+                    <input type="hidden" name="duracion" id="duracionTransferencia" value="1">
+                    <input type="file" class="form-control form-control-sm mb-2" name="comprobante" accept=".jpg,.jpeg,.png,.pdf" required>
+                    <button type="submit" class="btn btn-primary btn-sm w-100">Subir Comprobante</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function toggleModulo(id, card) {
+    var cb = document.getElementById('mod_' + id);
+    cb.checked = !cb.checked;
+    card.style.borderColor = cb.checked ? '#059669' : '#e2e8f0';
+    card.style.background = cb.checked ? '#f0fdf4' : '#fff';
+    actualizarPrecio();
+}
+function actualizarPrecio() {
+    var modulos = [];
+    document.querySelectorAll('input[name="modulos"]:checked').forEach(c => modulos.push(c.value));
+    var duracion = document.getElementById('duracion').value;
+    document.getElementById('duracionTransferencia').value = duracion;
+    fetch('/payments/calcular_precio', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({modulos: modulos, duracion: parseInt(duracion)})
+    }).then(r => r.json()).then(d => {
+        document.getElementById('precioMensual').textContent = '$' + d.subtotal_mensual;
+        document.getElementById('precioUnico').textContent = '$' + d.subtotal_unico;
+        document.getElementById('subtotalFinal').textContent = '$' + d.subtotal_final;
+        document.getElementById('iva').textContent = '$' + d.iva;
+        document.getElementById('total').textContent = '$' + d.total;
+        document.getElementById('filaUnico').style.display = d.subtotal_unico > 0 ? 'flex' : 'none';
+        if (d.aplica_descuento) {
+            document.getElementById('filaDescuento').style.display = 'flex';
+            document.getElementById('descuentoPct').textContent = d.descuento_pct;
+            document.getElementById('descuentoMonto').textContent = '-$' + d.descuento;
+        } else { document.getElementById('filaDescuento').style.display = 'none'; }
+        var r = document.getElementById('resumenModulos');
+        r.innerHTML = modulos.length ? '<span class="text-success fw-bold">' + modulos.length + ' módulos</span>' : 'Selecciona módulos';
+    });
+}
+document.getElementById('modalPago').addEventListener('show.bs.modal', function() {
+    var c = document.getElementById('modulosTransferencia'); c.innerHTML = '';
+    document.querySelectorAll('input[name="modulos"]:checked').forEach(cb => {
+        var i = document.createElement('input'); i.type = 'hidden'; i.name = 'modulos'; i.value = cb.value; c.appendChild(i);
+    });
+});
+var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+tooltipTriggerList.map(function (el) { return new bootstrap.Tooltip(el); });
+</script>
+<style>
+.modulo-card { border: 2px solid #e2e8f0; transition: all 0.15s; }
+.modulo-card:hover { border-color: #93c5fd; background: #f8fafc; }
+</style>
+{% endblock %}
